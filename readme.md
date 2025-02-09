@@ -16,7 +16,7 @@ For example:
  | record type | domain             | value             | remarks                                    |
  | ----------- | ------------------ | ----------------- | ------------------------------------------ |
  | A           | dokku.example.org  | <an ipv4 addess>  | used for connecting to the droplet         |
- | CNAME       | matrix.example.org | dokku.example.org | the [Synapse][syn] server, matrix protocol |
+ | A           | matrix.example.org | <an ipv4 addess> | the [Synapse][syn] server, matrix protocol |
  | CNAME       | chat.example.org   | dokku.example.org | the Element-Web frontend                   |
 
 
@@ -72,12 +72,6 @@ We can now link the database to the application
     postgres://postgres:random_postgres_password@dokku-postgres-synapsedb:5432/synapsedb
 
 
-Before we leave the remote, note the uid and gid for the dokku user and group - we'll need it in the next step
-
-    remote> id dokku
-    uid=1000(dokku) gid=1000(dokku) [...]
-
-
 Setting up the config files for Synapse
 ---------------------------------------
 
@@ -91,8 +85,6 @@ with the one from above and of cause adjust your server name ;-)
     -e SYNAPSE_SERVER_NAME=matrix.example.org \
     -e SYNAPSE_REPORT_STATS=yes \
     -e SYNAPSE_CONFIG_DIR=/config \
-    -e UID=1000 \
-    -e GID=1000 \
     matrixdotorg/synapse:latest generate
 
 Create a new directory with a git repo and add the files created in the
@@ -175,14 +167,11 @@ named "Dockerfile" with the following content:
     ENV SYNAPSE_SERVER_NAME matrix.example.org
     ENV SYNAPSE_REPORT_STATS yes
     ENV SYNAPSE_CONFIG_DIR /config
-    ENV UID 1000
-    ENV GID 1000
 
     # copy the right files to the right place
-    ADD nginx.conf.sigil /
-    ADD --chown=1000:1000 homeserver.yaml /config/
-    ADD --chown=1000:1000 matrix.example.org.log.config /config/
-    ADD --chown=1000:1000 matrix.example.org.signing.key /config/
+    ADD --chown=dokku:dokku homeserver.yaml /config/
+    ADD --chown=dokku:dokku matrix.example.org.log.config /config/
+    ADD --chown=dokku:dokku matrix.example.org.signing.key /config/
 
 Theoretically everything should be ok to deploy the repo to dokku for the first
 time. But unfortunately one more file is missing in the repo.
@@ -214,7 +203,7 @@ working http server on port 80. therefore we'll forward the requests to port
 have a certificate.
 
     # add a proxy on port 80
-    remote> dokku proxy:ports-add matrix http:80:8008
+    remote> dokku proxy:ports-add matrix http:80:8009
 
 
 Let's add let's encrypt
@@ -226,6 +215,23 @@ Let's add let's encrypt
     remote> dokku config:set --no-restart matrix DOKKU_LETSENCRYPT_EMAIL=your@email.tld
     remote> dokku letsencrypt:enable matrix
 
+    # if this step fail because of a 403 error it means your proxy is not configured correctly
+    remote> cd /home/dokku/matrix/nginx.conf.d
+    remote> sudo touch letsencrypt.conf
+    remote> suodo nano letsencrypt.conf
+
+    copy the following code to forward the acme challenge
+    ```
+    location /.well-known/acme-challenge {
+      proxy_pass http://localhost:8009;
+    }
+    ```
+
+    ref: https://github.com/Start9Labs/synapse/blob/master/docs/ACME.md
+
+    run again
+    remote> dokku letsencrypt:enable matrix
+
     # and enable automatic autorenewal
     remote> dokku letsencrypt:cron-job --add
 
@@ -234,6 +240,7 @@ After Let's encrypt works, we need to adjust port 8448 from http to https
     # switch proxy port 8448 to https
     remote> dokku proxy:ports-remove matrix 8448
     remote> dokku proxy:ports-add matrix https:8448:8008
+    remote> dokku proxy:ports-add matrix https:443:8008
 
 
 If you now visit http://matrix.example.org you should see something \o/
