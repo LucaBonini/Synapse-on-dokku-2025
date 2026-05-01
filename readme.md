@@ -80,12 +80,10 @@ and the private signing key in the image. Replace the UID and GID parameters
 with the one from above and of cause adjust your server name ;-)
 
     local> docker run -it --rm \
-    --mount type=volume,src=synapse-data,dst=/data \
-    --mount type=volume,src=synapse-data,dst=/config \
-    -e SYNAPSE_SERVER_NAME=matrix.example.org \
-    -e SYNAPSE_REPORT_STATS=yes \
-    -e SYNAPSE_CONFIG_DIR=/config \
-    matrixdotorg/synapse:latest generate
+        -v "$(pwd):/data" \
+        -e SYNAPSE_SERVER_NAME=matrix2.boniniluca.com \
+        -e SYNAPSE_REPORT_STATS=yes \
+        matrixdotorg/synapse:latest generate
 
 Create a new directory with a git repo and add the files created in the
 previous step: `homeserver.yaml`, `matrix.example.com.log.config` and
