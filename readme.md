@@ -81,7 +81,7 @@ with the one from above and of cause adjust your server name ;-)
 
     local> docker run -it --rm \
         -v "$(pwd):/data" \
-        -e SYNAPSE_SERVER_NAME=matrix2.boniniluca.com \
+        -e SYNAPSE_SERVER_NAME=matrix.dokku.com \
         -e SYNAPSE_REPORT_STATS=yes \
         matrixdotorg/synapse:latest generate
 
